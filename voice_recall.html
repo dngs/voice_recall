@@ -17,7 +17,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 #answerInput:focus{outline:none;border-color:var(--primary);background:#fff}
 .input-section{background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
 .input-section .section-title{font-size:14px;font-weight:bold;color:var(--text);margin-bottom:10px}
-#recordBtn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:17px;font-weight:bold;cursor:pointer;min-height:52px;transition:all .2s;background:var(--primary);color:#fff}
+#recordBtn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:17px;font-weight:bold;cursor:pointer;min-height:52px;background:var(--primary);color:#fff}
 #recordBtn:active{transform:scale(.97)}
 #recordBtn.recording{background:var(--red);animation:pulse 1.5s infinite}
 #recordBtn:disabled{background:var(--gray);cursor:not-allowed}
@@ -49,11 +49,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 .actions button{padding:10px 28px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-size:14px;color:var(--text);cursor:pointer;margin:0 4px}
 .actions button:active{background:#ecf0f1}
 .diag{font-size:11px;color:var(--gray);text-align:center;padding:6px;margin-top:8px;word-break:break-all}
+.errbox{background:#f8d7da;border:1px solid #f5c6cb;border-radius:8px;padding:10px;margin:8px 0;font-size:13px;color:#721c24;display:none}
+.errbox.show{display:block}
 </style>
 </head>
 <body>
 <div class="container">
   <div class="header"><h1>🎤 语音背诵对比</h1></div>
+
+  <div class="errbox" id="errbox"></div>
 
   <div class="answer-section">
     <label>📖 标准答案（可编辑）</label>
@@ -70,10 +74,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
   <div class="divider">或</div>
 
   <div class="input-section">
-    <div class="section-title">方式二：语音听写输入</div>
-    <input type="text" id="manualInput" placeholder="点此输入框 → 键盘🎤听写" autocomplete="off">
+    <div class="section-title">方式二：手动输入 / 听写</div>
+    <input type="text" id="manualInput" placeholder="在此输入或粘贴答案文本" autocomplete="off">
     <button id="compareBtn">对比</button>
-    <div class="hint">点击输入框弹出键盘，按键盘上的🎤图标语音输入</div>
+    <div class="hint">直接打字输入，或手机键盘听写</div>
   </div>
 
   <div id="status">选择上方任一方式开始</div>
@@ -99,6 +103,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Micr
 </div>
 
 <script>
+// ===== 全局错误捕获 =====
+window.onerror = function(msg, url, line, col, err){
+  var box = document.getElementById('errbox');
+  if(box){
+    box.innerHTML = '⚠️ JS错误: ' + msg + ' (行:' + line + ')';
+    box.classList.add('show');
+  }
+  return false;
+};
+
 // ===== 全局变量 =====
 var recognition = null;
 var isRecording = false;
@@ -106,7 +120,148 @@ var recognizedText = '';
 var startTimeout = null;
 var pinyinReady = false;
 
-// ===== 异步加载拼音库（不阻塞页面）=====
+// ===== 第一步：立即绑定所有按钮事件（不依赖任何外部库）=====
+// 这样即使语音识别初始化失败，方式二也能正常工作
+document.addEventListener('DOMContentLoaded', function(){
+  var diag = document.getElementById('diag');
+  diag.textContent = '✅ 页面JS已加载';
+
+  // 绑定对比按钮（方式二）
+  var compareBtn = document.getElementById('compareBtn');
+  if(compareBtn){
+    compareBtn.onclick = function(){
+      var t = document.getElementById('manualInput').value.trim();
+      if(t){
+        recognizedText = t;
+        doComparison(t);
+      } else {
+        showStatus('请先在输入框中输入文字', 'error');
+      }
+    };
+  }
+
+  // 绑定输入框回车
+  var manualInput = document.getElementById('manualInput');
+  if(manualInput){
+    manualInput.addEventListener('keypress', function(e){
+      if(e.key === 'Enter'){
+        var t = this.value.trim();
+        if(t){ recognizedText = t; doComparison(t); }
+      }
+    });
+  }
+
+  // 绑定录音按钮（方式一）
+  var recordBtn = document.getElementById('recordBtn');
+  if(recordBtn){
+    recordBtn.onclick = toggleRecording;
+  }
+
+  // 从URL获取答案
+  try {
+    var ans = '';
+    var qs = window.location.search;
+    if(qs){
+      var m = qs.match(/[?&]answer=([^&]*)/);
+      if(!m) m = qs.match(/[?&]a=([^&]*)/);
+      if(m) ans = decodeURIComponent(m[1]);
+    }
+    if(!ans && window.location.hash){
+      var h = window.location.hash.substring(1);
+      if(h.indexOf('answer=') === 0) ans = decodeURIComponent(h.substring(7));
+      else if(h) ans = decodeURIComponent(h);
+    }
+    if(ans) document.getElementById('answerInput').value = ans;
+  } catch(e){
+    // URL解析失败不影响使用
+  }
+
+  // 检测环境并显示
+  var hasSR = ('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window);
+  var isSecure = window.isSecureContext || location.protocol === 'https:' || location.hostname === 'localhost';
+  var ua = navigator.userAgent;
+  var platform = ua.indexOf('iPhone') > -1 || ua.indexOf('iPad') > -1 ? 'iOS'
+    : ua.indexOf('Android') > - -1 ? 'Android' : '桌面';
+  diag.innerHTML = '✅ JS已加载 | 平台:' + platform +
+    ' | 语音API:' + (hasSR ? '支持' : '不支持') +
+    ' | HTTPS:' + (isSecure ? '是' : '否');
+
+  // 初始化语音识别（放在最后，失败不影响其他功能）
+  try {
+    if(hasSR){
+      var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SR();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = function(){
+        clearTimeout(startTimeout);
+        isRecording = true;
+        var btn = document.getElementById('recordBtn');
+        btn.textContent = '🔴 录音中... 点击停止';
+        btn.classList.add('recording');
+        showStatus('录音中... 请朗读答案', 'recording');
+      };
+
+      recognition.onresult = function(event){
+        var interim = '', final = '';
+        for(var i = event.resultIndex; i < event.results.length; i++){
+          if(event.results[i].isFinal) final += event.results[i][0].transcript;
+          else interim += event.results[i][0].transcript;
+        }
+        if(interim) document.getElementById('interim').textContent = '识别中: ' + interim;
+        if(final){ recognizedText = final; document.getElementById('interim').textContent = ''; }
+      };
+
+      recognition.onerror = function(event){
+        clearTimeout(startTimeout);
+        isRecording = false;
+        var btn = document.getElementById('recordBtn');
+        btn.textContent = '🎤 重新录音';
+        btn.classList.remove('recording');
+        var msg = '';
+        switch(event.error){
+          case 'no-speech': msg = '未检测到语音，请重试'; break;
+          case 'audio-capture': msg = '无法访问麦克风，请检查设备'; break;
+          case 'not-allowed': msg = '麦克风权限被拒绝。请点击地址栏左侧🔒→允许麦克风'; break;
+          case 'service-not-allowed': msg = '语音服务不可用（可能被墙）。请用方式二手动输入'; break;
+          case 'network': msg = '网络错误，语音服务无法连接。请用方式二手动输入'; break;
+          case 'aborted': msg = '录音已取消'; break;
+          default: msg = '错误: ' + event.error;
+        }
+        showStatus('❌ ' + msg, 'error');
+        document.getElementById('recHint').innerHTML = '👉 录音不可用？请用下方方式二直接输入';
+      };
+
+      recognition.onend = function(){
+        clearTimeout(startTimeout);
+        isRecording = false;
+        var btn = document.getElementById('recordBtn');
+        btn.textContent = '🎤 重新录音';
+        btn.classList.remove('recording');
+        if(recognizedText){
+          doComparison(recognizedText);
+        } else {
+          showStatus('未识别到内容，请重试或用方式二', 'error');
+        }
+      };
+    } else {
+      var btn = document.getElementById('recordBtn');
+      btn.textContent = '⚠️ 浏览器不支持语音录音';
+      btn.disabled = true;
+      document.getElementById('recHint').textContent = '请用方式二：在输入框中打字输入';
+    }
+  } catch(e) {
+    // 语音识别初始化失败，不影响方式二
+    var btn2 = document.getElementById('recordBtn');
+    if(btn2){ btn2.textContent = '⚠️ 录音不可用'; btn2.disabled = true; }
+    document.getElementById('recHint').textContent = '录音初始化失败，请用方式二输入';
+  }
+});
+
+// ===== 异步加载拼音库 =====
 (function(){
   var s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js';
@@ -115,124 +270,22 @@ var pinyinReady = false;
   document.head.appendChild(s);
 })();
 
-// ===== 初始化 =====
-function init(){
-  // 从URL获取答案
-  var params = new URLSearchParams(location.search);
-  var ans = params.get('answer') || params.get('a') || '';
-  if(!ans && location.hash){
-    var h = location.hash.substring(1);
-    if(h.indexOf('answer=')===0) ans = decodeURIComponent(h.substring(7));
-    else if(h) ans = decodeURIComponent(h);
-  }
-  if(ans) document.getElementById('answerInput').value = ans;
+// ===== 工具函数 =====
+function showStatus(msg, cls){
+  var st = document.getElementById('status');
+  st.textContent = msg;
+  st.className = cls || '';
+}
 
-  // 检测环境
-  var hasSR = ('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window);
-  var isSecure = window.isSecureContext || location.protocol==='https:' || location.hostname==='localhost' || location.protocol==='file:';
-  var ua = navigator.userAgent;
-
-  var diag = document.getElementById('diag');
-  diag.innerHTML = '浏览器: ' + (ua.indexOf('iPhone')>-1||ua.indexOf('iPad')>-1?'iOS':ua.indexOf('Android')>-1?'Android':'其他') +
-    ' | 语音API: ' + (hasSR?'支持':'不支持') +
-    ' | HTTPS: ' + (isSecure?'是':'否') +
-    ' | 拼音库: ' + (pinyinReady?'已加载':'加载中');
-
-  // 设置录音
-  if(hasSR){
-    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    recognition = new SR();
-    recognition.lang = 'zh-CN';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = function(){
-      clearTimeout(startTimeout);
-      isRecording = true;
-      var btn = document.getElementById('recordBtn');
-      btn.textContent = '🔴 录音中... 点击停止';
-      btn.classList.add('recording');
-      var st = document.getElementById('status');
-      st.textContent = '录音中... 请朗读答案';
-      st.className = 'recording';
-    };
-
-    recognition.onresult = function(event){
-      var interim='', final='';
-      for(var i=event.resultIndex;i<event.results.length;i++){
-        if(event.results[i].isFinal) final += event.results[i][0].transcript;
-        else interim += event.results[i][0].transcript;
-      }
-      if(interim) document.getElementById('interim').textContent = '识别中: ' + interim;
-      if(final){ recognizedText = final; document.getElementById('interim').textContent=''; }
-    };
-
-    recognition.onerror = function(event){
-      clearTimeout(startTimeout);
-      isRecording = false;
-      var btn = document.getElementById('recordBtn');
-      btn.textContent = '🎤 重新录音';
-      btn.classList.remove('recording');
-      var st = document.getElementById('status');
-      var msg = '';
-      switch(event.error){
-        case 'no-speech': msg='未检测到语音，请重试'; break;
-        case 'audio-capture': msg='无法访问麦克风，请检查设备'; break;
-        case 'not-allowed': msg='麦克风权限被拒绝。请长按地址栏左侧🔒图标→允许麦克风'; break;
-        case 'service-not-allowed': msg='语音服务不可用。请用方式二（听写输入）'; break;
-        case 'network': msg='网络错误，语音服务无法连接。请用方式二（听写输入）'; break;
-        case 'aborted': msg='录音已取消'; break;
-        default: msg='错误: ' + event.error;
-      }
-      st.textContent = '❌ ' + msg;
-      st.className = 'error';
-      document.getElementById('recHint').textContent = '录音不可用？请用下方方式二：点击输入框→键盘听写';
-    };
-
-    recognition.onend = function(){
-      clearTimeout(startTimeout);
-      isRecording = false;
-      var btn = document.getElementById('recordBtn');
-      btn.textContent = '🎤 重新录音';
-      btn.classList.remove('recording');
-      if(recognizedText){
-        doComparison(recognizedText);
-      } else {
-        var st = document.getElementById('status');
-        st.textContent = '未识别到内容，请重试或用方式二';
-        st.className = 'error';
-      }
-    };
-
-  } else {
-    // 不支持Web Speech API
-    var btn = document.getElementById('recordBtn');
-    btn.textContent = '⚠️ 此浏览器不支持语音录音';
-    btn.disabled = true;
-    document.getElementById('recHint').textContent = '请用方式二：点击输入框→键盘上的🎤听写';
-  }
-
-  // 手动输入
-  document.getElementById('compareBtn').onclick = function(){
-    var t = document.getElementById('manualInput').value.trim();
-    if(t){ recognizedText = t; doComparison(t); }
-  };
-  document.getElementById('manualInput').addEventListener('keypress', function(e){
-    if(e.key==='Enter'){ var t=this.value.trim(); if(t){ recognizedText=t; doComparison(t); } }
-  });
-  document.getElementById('manualInput').addEventListener('input', function(){
-    if(this.value.trim().length > 0){
-      document.getElementById('compareBtn').style.display='block';
-    }
-  });
+function esc(s){
+  if(!s) return '';
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ===== 录音控制 =====
 function toggleRecording(){
   if(!recognition){
-    document.getElementById('status').textContent = '⚠️ 此浏览器不支持语音录音，请用方式二';
-    document.getElementById('status').className = 'error';
+    showStatus('⚠️ 此浏览器不支持语音录音，请用方式二', 'error');
     return;
   }
   if(isRecording){
@@ -240,27 +293,21 @@ function toggleRecording(){
     return;
   }
 
-  // 清空之前的结果
   recognizedText = '';
   document.getElementById('interim').textContent = '';
   document.getElementById('results').classList.remove('show');
   document.getElementById('actions').style.display = 'none';
 
-  // 立即给视觉反馈
   var btn = document.getElementById('recordBtn');
   btn.textContent = '正在启动...';
-  var st = document.getElementById('status');
-  st.textContent = '正在启动录音...';
-  st.className = '';
+  showStatus('正在启动录音...', '');
 
-  // 超时检测：3秒内如果onstart没触发，说明有问题
   clearTimeout(startTimeout);
   startTimeout = setTimeout(function(){
     if(!isRecording){
       btn.textContent = '🎤 重新录音';
-      st.textContent = '❌ 录音启动失败。可能原因：1)麦克风权限未授予 2)网络无法连接语音服务。请用方式二：点击输入框→键盘听写';
-      st.className = 'error';
-      document.getElementById('recHint').innerHTML = '👉 <b>推荐</b>：用下方方式二，点击输入框弹出键盘，按键盘上的🎤图标语音输入';
+      showStatus('❌ 录音启动失败。可能：1)麦克风未授权 2)网络无法连接Google语音服务。请用方式二', 'error');
+      document.getElementById('recHint').innerHTML = '👉 <b>用下方方式二</b>：在输入框打字，点"对比"';
     }
   }, 3000);
 
@@ -269,9 +316,7 @@ function toggleRecording(){
   } catch(e) {
     clearTimeout(startTimeout);
     btn.textContent = '🎤 重新录音';
-    st.textContent = '❌ 启动失败: ' + e.message + '。请用方式二：点击输入框→键盘听写';
-    st.className = 'error';
-    document.getElementById('recHint').innerHTML = '👉 <b>推荐</b>：用下方方式二，点击输入框弹出键盘，按键盘上的🎤图标语音输入';
+    showStatus('❌ 启动失败: ' + e.message + '。请用方式二', 'error');
   }
 }
 
@@ -281,33 +326,31 @@ function resetAll(){
   document.getElementById('manualInput').value = '';
   document.getElementById('results').classList.remove('show');
   document.getElementById('actions').style.display = 'none';
-  var st = document.getElementById('status');
-  st.textContent = '选择上方任一方式开始';
-  st.className = '';
+  showStatus('选择上方任一方式开始', '');
 }
 
 // ===== 文本处理 =====
 function removePunctuation(text){
   if(!text) return '';
-  text = text.replace(/<[^>]+>/g,'');
-  text = text.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g,'$1');
+  text = text.replace(/<[^>]+>/g, '');
+  text = text.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g, '$1');
   var el = document.createElement('div');
   el.innerHTML = text;
   text = el.textContent || el.innerText || '';
-  var cn = '，。！？；：、""''（）《》【】…—·「」『』〈〉〔〕〖〗〘〙〚〛～';
-  for(var i=0;i<cn.length;i++) text = text.split(cn[i]).join('');
-  text = text.replace(/[^\w\u4e00-\u9fff]/g,'');
+  var cn = '，。！？；：、\u201c\u201d\u2018\u2019（）《》【】…—·「」『』〈〉〔〕〖〗〘〙〚〛～';
+  for(var i = 0; i < cn.length; i++) text = text.split(cn.charAt(i)).join('');
+  text = text.replace(/[^\w\u4e00-\u9fff]/g, '');
   return text;
 }
 
 function getCharPinyin(ch){
   if(!ch) return '';
   if(!/[\u4e00-\u9fff]/.test(ch)) return ch.toLowerCase();
-  if(pinyinReady && typeof pinyinPro!=='undefined'){
-    try{
-      var py = pinyinPro.pinyin(ch,{toneType:'none',type:'array'});
-      if(py && py.length>0) return py[0];
-    }catch(e){}
+  if(pinyinReady && typeof pinyinPro !== 'undefined'){
+    try {
+      var py = pinyinPro.pinyin(ch, {toneType: 'none', type: 'array'});
+      if(py && py.length > 0) return py[0];
+    } catch(e){}
   }
   return ch;
 }
@@ -316,98 +359,93 @@ function getCharPinyin(ch){
 function compareTexts(rec, ans){
   rec = removePunctuation(rec);
   ans = removePunctuation(ans);
-  var m=rec.length, n=ans.length;
-  if(m===0&&n===0) return {alignment:[],stats:{total:0,exact:0,homophone:0,mismatch:0,extra:0,missing:0,score:100},result:'perfect'};
-  if(m===0) return {alignment:ans.split('').map(function(c){return['missing','',c]}),stats:{total:n,exact:0,homophone:0,mismatch:0,extra:0,missing:n,score:0},result:'incorrect'};
-  if(n===0) return {alignment:rec.split('').map(function(c){return['extra',c,'']}),stats:{total:m,exact:0,homophone:0,mismatch:0,extra:m,missing:0,score:0},result:'incorrect'};
+  var m = rec.length, n = ans.length;
+  if(m === 0 && n === 0) return {alignment: [], stats: {total:0, exact:0, homophone:0, mismatch:0, extra:0, missing:0, score:100}, result: 'perfect'};
+  if(m === 0) return {alignment: ans.split('').map(function(c){return ['missing', '', c];}), stats: {total:n, exact:0, homophone:0, mismatch:0, extra:0, missing:n, score:0}, result: 'incorrect'};
+  if(n === 0) return {alignment: rec.split('').map(function(c){return ['extra', c, ''];}), stats: {total:m, exact:0, homophone:0, mismatch:0, extra:m, missing:0, score:0}, result: 'incorrect'};
 
-  var rc=rec.split(''), ac=ans.split('');
-  var rpy=rc.map(getCharPinyin), apy=ac.map(getCharPinyin);
-  var dp=[];
-  for(var i=0;i<=m;i++){dp.push(new Array(n+1).fill(0));dp[i][0]=i;}
-  for(var j=0;j<=n;j++) dp[0][j]=j;
-  for(i=1;i<=m;i++)for(j=1;j<=n;j++){
+  var rc = rec.split(''), ac = ans.split('');
+  var rpy = rc.map(getCharPinyin), apy = ac.map(getCharPinyin);
+  var dp = [];
+  for(var i = 0; i <= m; i++){ dp.push(new Array(n + 1).fill(0)); dp[i][0] = i; }
+  for(var j = 0; j <= n; j++) dp[0][j] = j;
+  for(i = 1; i <= m; i++) for(j = 1; j <= n; j++){
     var c;
-    if(rc[i-1]===ac[j-1]) c=0;
-    else if(rpy[i-1]&&apy[j-1]&&rpy[i-1]===apy[j-1]) c=1;
-    else c=2;
-    dp[i][j]=Math.min(dp[i-1][j-1]+c,dp[i-1][j]+1,dp[i][j-1]+1);
+    if(rc[i-1] === ac[j-1]) c = 0;
+    else if(rpy[i-1] && apy[j-1] && rpy[i-1] === apy[j-1]) c = 1;
+    else c = 2;
+    dp[i][j] = Math.min(dp[i-1][j-1] + c, dp[i-1][j] + 1, dp[i][j-1] + 1);
   }
-  var align=[]; i=m;j=n;
-  while(i>0||j>0){
-    if(i>0&&j>0){
+  var align = []; i = m; j = n;
+  while(i > 0 || j > 0){
+    if(i > 0 && j > 0){
       var c;
-      if(rc[i-1]===ac[j-1]) c=0;
-      else if(rpy[i-1]&&apy[j-1]&&rpy[i-1]===apy[j-1]) c=1;
-      else c=2;
-      if(dp[i][j]===dp[i-1][j-1]+c){
-        if(c===0) align.push(['exact',rc[i-1],ac[j-1]]);
-        else if(c===1) align.push(['homophone',rc[i-1],ac[j-1]]);
-        else align.push(['mismatch',rc[i-1],ac[j-1]]);
-        i--;j--;
-      }else if(dp[i][j]===dp[i-1][j]+1){align.push(['extra',rc[i-1],'']);i--;}
-      else{align.push(['missing','',ac[j-1]]);j--;}
-    }else if(i>0){align.push(['extra',rc[i-1],'']);i--;}
-    else{align.push(['missing','',ac[j-1]]);j--;}
+      if(rc[i-1] === ac[j-1]) c = 0;
+      else if(rpy[i-1] && apy[j-1] && rpy[i-1] === apy[j-1]) c = 1;
+      else c = 2;
+      if(dp[i][j] === dp[i-1][j-1] + c){
+        if(c === 0) align.push(['exact', rc[i-1], ac[j-1]]);
+        else if(c === 1) align.push(['homophone', rc[i-1], ac[j-1]]);
+        else align.push(['mismatch', rc[i-1], ac[j-1]]);
+        i--; j--;
+      } else if(dp[i][j] === dp[i-1][j] + 1){ align.push(['extra', rc[i-1], '']); i--; }
+      else { align.push(['missing', '', ac[j-1]]); j--; }
+    } else if(i > 0){ align.push(['extra', rc[i-1], '']); i--; }
+    else { align.push(['missing', '', ac[j-1]]); j--; }
   }
   align.reverse();
-  var s={total:align.length,exact:0,homophone:0,mismatch:0,extra:0,missing:0};
-  for(var k=0;k<align.length;k++) s[align[k][0]]++;
-  s.correct=s.exact+s.homophone;
-  s.score=s.total>0?Math.round(s.correct/s.total*1000)/10:0;
+  var s = {total: align.length, exact: 0, homophone: 0, mismatch: 0, extra: 0, missing: 0};
+  for(var k = 0; k < align.length; k++) s[align[k][0]]++;
+  s.correct = s.exact + s.homophone;
+  s.score = s.total > 0 ? Math.round(s.correct / s.total * 1000) / 10 : 0;
   var r;
-  if(s.mismatch===0&&s.extra===0&&s.missing===0) r=s.homophone===0?'perfect':'correct_with_homophones';
-  else r='incorrect';
-  return {alignment:align,stats:s,result:r};
+  if(s.mismatch === 0 && s.extra === 0 && s.missing === 0) r = s.homophone === 0 ? 'perfect' : 'correct_with_homophones';
+  else r = 'incorrect';
+  return {alignment: align, stats: s, result: r};
 }
 
 // ===== 结果展示 =====
 function doComparison(text){
   var ans = document.getElementById('answerInput').value;
   if(!ans.trim()){
-    var st=document.getElementById('status');
-    st.textContent='请先输入标准答案';
-    st.className='error';
+    showStatus('请先在上方答案框输入标准答案', 'error');
     return;
   }
-  var cmp = compareTexts(text, ans);
-  var s = cmp.stats;
-  var rh='', ah='';
-  for(var i=0;i<cmp.alignment.length;i++){
-    var item=cmp.alignment[i], st=item[0], rc=item[1], ac=item[2];
-    if(st==='exact'){rh+='<span style="color:var(--green)">'+esc(rc)+'</span>';ah+='<span style="color:var(--green)">'+esc(ac)+'</span>';}
-    else if(st==='homophone'){rh+='<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">['+esc(rc)+'→'+esc(ac)+']</span>';ah+='<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">'+esc(ac)+'</span>';}
-    else if(st==='mismatch'){rh+='<span style="color:var(--red);font-weight:bold;background:#fadbd8">'+esc(rc)+'</span>';ah+='<span style="color:var(--red);font-weight:bold;background:#fadbd8">'+esc(ac)+'</span>';}
-    else if(st==='extra'){rh+='<span style="color:var(--gray);text-decoration:line-through">'+esc(rc)+'</span>';ah+='<span style="color:#ecf0f1">＿</span>';}
-    else if(st==='missing'){rh+='<span style="color:#ecf0f1">＿</span>';ah+='<span style="color:var(--red);text-decoration:underline;background:#fdf2e9">'+esc(ac)+'</span>';}
+  try {
+    var cmp = compareTexts(text, ans);
+    var s = cmp.stats;
+    var rh = '', ah = '';
+    for(var i = 0; i < cmp.alignment.length; i++){
+      var item = cmp.alignment[i], st = item[0], rc = item[1], ac = item[2];
+      if(st === 'exact'){ rh += '<span style="color:var(--green)">' + esc(rc) + '</span>'; ah += '<span style="color:var(--green)">' + esc(ac) + '</span>'; }
+      else if(st === 'homophone'){ rh += '<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">[' + esc(rc) + '→' + esc(ac) + ']</span>'; ah += '<span style="color:var(--orange);text-decoration:underline wavy var(--orange)">' + esc(ac) + '</span>'; }
+      else if(st === 'mismatch'){ rh += '<span style="color:var(--red);font-weight:bold;background:#fadbd8">' + esc(rc) + '</span>'; ah += '<span style="color:var(--red);font-weight:bold;background:#fadbd8">' + esc(ac) + '</span>'; }
+      else if(st === 'extra'){ rh += '<span style="color:var(--gray);text-decoration:line-through">' + esc(rc) + '</span>'; ah += '<span style="color:#ecf0f1">＿</span>'; }
+      else if(st === 'missing'){ rh += '<span style="color:#ecf0f1">＿</span>'; ah += '<span style="color:var(--red);text-decoration:underline;background:#fdf2e9">' + esc(ac) + '</span>'; }
+    }
+    document.getElementById('recResult').innerHTML = rh || '<span style="color:#bdc3c7">（空）</span>';
+    document.getElementById('ansResult').innerHTML = ah || '<span style="color:#bdc3c7">（空）</span>';
+    var banner = document.getElementById('resultBanner');
+    var bt = '';
+    if(cmp.result === 'perfect'){ banner.className = 'result-banner perfect'; bt = '✅ 完全正确'; }
+    else if(cmp.result === 'correct_with_homophones'){ banner.className = 'result-banner homophone'; bt = '✅ 正确（' + s.homophone + '个同音字）'; }
+    else { banner.className = 'result-banner incorrect'; bt = '❌ 不正确'; }
+    banner.innerHTML = bt + '<span class="score">得分 ' + s.score + '%</span>';
+    document.getElementById('results').classList.add('show');
+    document.getElementById('actions').style.display = 'block';
+    if(cmp.result === 'perfect') showStatus('✅ 完全正确！得分 ' + s.score + '%', 'success');
+    else if(cmp.result === 'correct_with_homophones') showStatus('✅ 正确（' + s.homophone + '个同音字）得分 ' + s.score + '%', 'success');
+    else showStatus('❌ 不正确，得分 ' + s.score + '%', 'error');
+  } catch(e) {
+    showStatus('❌ 对比出错: ' + e.message, 'error');
   }
-  document.getElementById('recResult').innerHTML=rh||'<span style="color:#bdc3c7">（空）</span>';
-  document.getElementById('ansResult').innerHTML=ah||'<span style="color:#bdc3c7">（空）</span>';
-  var banner=document.getElementById('resultBanner');
-  var bt='';
-  if(cmp.result==='perfect'){banner.className='result-banner perfect';bt='✅ 完全正确';}
-  else if(cmp.result==='correct_with_homophones'){banner.className='result-banner homophone';bt='✅ 正确（'+s.homophone+'个同音字）';}
-  else{banner.className='result-banner incorrect';bt='❌ 不正确';}
-  banner.innerHTML=bt+'<span class="score">得分 '+s.score+'%</span>';
-  document.getElementById('results').classList.add('show');
-  document.getElementById('actions').style.display='block';
-  var stEl=document.getElementById('status');
-  if(cmp.result==='perfect'){stEl.textContent='✅ 完全正确！得分 '+s.score+'%';stEl.className='success';}
-  else if(cmp.result==='correct_with_homophones'){stEl.textContent='✅ 正确（'+s.homophone+'个同音字）得分 '+s.score+'%';stEl.className='success';}
-  else{stEl.textContent='❌ 不正确，得分 '+s.score+'%';stEl.className='error';}
 }
-
-function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function copyResult(){
-  var t=document.getElementById('status').textContent+'\n识别: '+(document.getElementById('recResult').textContent||'')+'\n答案: '+(document.getElementById('ansResult').textContent||'');
-  if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert('已复制')});}
-  else{var e=document.createElement('textarea');e.value=t;document.body.appendChild(e);e.select();document.execCommand('copy');document.body.removeChild(e);alert('已复制');}
+  var t = document.getElementById('status').textContent + '\n识别: ' + (document.getElementById('recResult').textContent || '') + '\n答案: ' + (document.getElementById('ansResult').textContent || '');
+  if(navigator.clipboard){ navigator.clipboard.writeText(t).then(function(){ alert('已复制'); }); }
+  else { var e = document.createElement('textarea'); e.value = t; document.body.appendChild(e); e.select(); document.execCommand('copy'); document.body.removeChild(e); alert('已复制'); }
 }
-
-// ===== 事件绑定 =====
-document.getElementById('recordBtn').addEventListener('click', toggleRecording);
-window.addEventListener('load', init);
 </script>
 </body>
 </html>
