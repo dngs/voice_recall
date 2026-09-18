@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>语音背诵对比</title>
+<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --green:#27ae60; --orange:#e67e22; --red:#e74c3c; --gray:#95a5a6;
+  --bg:#f5f6fa; --card:#fff; --primary:#3498db; --primary-dark:#2980b9;
+  --text:#2c3e50; --text-light:#7f8c8d; --border:#e0e0e0;
+}
+body {
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.6;
+  -webkit-tap-highlight-color:transparent;
+}
+.container { max-width:600px; margin:0 auto; padding:12px; }
+
+/* Header */
+.header { text-align:center; padding:12px 0 8px; }
+.header h1 { font-size:20px; color:var(--text); }
+
+/* Answer section */
+.answer-section {
+  background:var(--card); border-radius:10px; padding:12px;
+  margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+.answer-section label {
+  font-size:13px; color:var(--text-light); display:block; margin-bottom:6px;
+}
+#answerInput {
+  width:100%; min-height:60px; padding:10px; border:1px solid var(--border);
+  border-radius:8px; font-size:15px; resize:vertical; font-family:inherit;
+  background:#fafafa;
+}
+#answerInput:focus { outline:none; border-color:var(--primary); background:#fff; }
+
+/* Record section */
+.record-section {
+  text-align:center; padding:16px 0;
+}
+#recordBtn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  background:var(--primary); color:#fff; border:none;
+  padding:14px 40px; border-radius:50px; font-size:17px; font-weight:bold;
+  cursor:pointer; min-height:52px; transition:all 0.2s;
+  box-shadow:0 2px 8px rgba(52,152,219,0.3);
+}
+#recordBtn:active { transform:scale(0.96); }
+#recordBtn.recording {
+  background:var(--red); animation:pulse 1.5s infinite;
+  box-shadow:0 2px 8px rgba(231,76,60,0.4);
+}
+#recordBtn:disabled { background:var(--gray); cursor:not-allowed; box-shadow:none; }
+@keyframes pulse {
+  0%,100% { box-shadow:0 0 0 0 rgba(231,76,60,0.4); }
+  50% { box-shadow:0 0 0 12px rgba(231,76,60,0); }
+}
+
+/* Fallback input (iOS) */
+.fallback-section {
+  background:#fff3cd; border:1px solid #ffe08a; border-radius:8px;
+  padding:10px; margin-top:10px; display:none;
+}
+.fallback-section p { font-size:13px; color:#856404; margin-bottom:8px; }
+#manualInput {
+  width:100%; padding:10px; border:1px solid var(--border); border-radius:8px;
+  font-size:15px; font-family:inherit;
+}
+#manualInput:focus { outline:none; border-color:var(--primary); }
+#compareBtn {
+  margin-top:8px; width:100%; padding:10px; background:var(--primary);
+  color:#fff; border:none; border-radius:8px; font-size:15px; cursor:pointer;
+}
+#compareBtn:active { background:var(--primary-dark); }
+
+/* Status */
+#status {
+  text-align:center; padding:8px; font-size:14px; color:var(--text-light);
+  min-height:24px;
+}
+#status.recording { color:var(--red); font-weight:bold; }
+#status.success { color:var(--green); font-weight:bold; }
+#status.error { color:var(--red); }
+
+/* Results */
+.results { display:none; }
+.results.show { display:block; }
+.result-banner {
+  text-align:center; padding:12px; border-radius:8px; margin-bottom:10px;
+  font-size:18px; font-weight:bold;
+}
+.result-banner.perfect { background:#d4edda; color:var(--green); }
+.result-banner.homophone { background:#fff3cd; color:#856404; }
+.result-banner.incorrect { background:#f8d7da; color:var(--red); }
+.score { font-size:14px; font-weight:normal; margin-left:8px; }
+
+.text-block {
+  background:var(--card); border-radius:8px; padding:12px; margin-bottom:8px;
+  box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+.text-block .label { font-size:12px; color:var(--text-light); margin-bottom:6px; }
+.text-block .content { font-size:20px; line-height:2.4; }
+.text-block .content span { display:inline; }
+
+/* Legend */
+.legend {
+  font-size:12px; color:var(--gray); text-align:center;
+  padding:8px; border-top:1px solid var(--border); margin-top:8px;
+}
+.legend span { margin:0 6px; }
+
+/* Actions */
+.actions { text-align:center; padding:12px 0; }
+.actions button {
+  padding:10px 28px; border:1px solid var(--border); border-radius:8px;
+  background:var(--card); font-size:14px; color:var(--text); cursor:pointer;
+  margin:0 4px;
+}
+.actions button:active { background:#ecf0f1; }
+
+/* Interim results */
+#interim {
+  text-align:center; font-size:15px; color:var(--text-light);
+  min-height:22px; padding:4px; font-style:italic;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>🎤 语音背诵对比</h1>
+  </div>
+
+  <!-- Answer text -->
+  <div class="answer-section">
+    <label>📖 标准答案（可编辑）</label>
+    <textarea id="answerInput" placeholder="粘贴或输入答案文本..."></textarea>
+  </div>
+
+  <!-- Record button -->
+  <div class="record-section">
+    <button id="recordBtn">🎤 开始录音</button>
+    <div id="interim"></div>
+  </div>
+
+  <!-- iOS Fallback -->
+  <div class="fallback-section" id="fallbackSection">
+    <p>💡 当前浏览器不支持语音识别。请点击下方输入框，使用键盘上的<span style="font-size:16px">🎤</span>听写按钮语音输入：</p>
+    <input type="text" id="manualInput" placeholder="点击此处，用键盘听写输入..." autocomplete="off">
+    <button id="compareBtn">对比</button>
+  </div>
+
+  <!-- Status -->
+  <div id="status">点击录音按钮开始背诵</div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="result-banner" id="resultBanner"></div>
+    <div class="text-block">
+      <div class="label">🗣️ 识别结果</div>
+      <div class="content" id="recResult"></div>
+    </div>
+    <div class="text-block">
+      <div class="label">📖 标准答案</div>
+      <div class="content" id="ansResult"></div>
+    </div>
+    <div class="legend">
+      <span style="color:var(--green)">■</span>完全匹配
+      <span style="color:var(--orange)">■</span>同音字
+      <span style="color:var(--red)">■</span>不匹配
+      <span style="color:var(--gray)">■</span>多余/遗漏
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions" id="actions" style="display:none">
+    <button onclick="resetRecording()">🎤 重新录音</button>
+    <button onclick="copyResult()">📋 复制结果</button>
+  </div>
+</div>
+
+<script>
+// ===== 全局状态 =====
+var recognition = null;
+var isRecording = false;
+var recognizedText = '';
+
+// ===== 初始化 =====
+function init() {
+  // 从URL参数获取答案
+  var params = new URLSearchParams(window.location.search);
+  var answerFromUrl = params.get('answer') || params.get('a') || '';
+  if (answerFromUrl) {
+    document.getElementById('answerInput').value = decodeURIComponent(answerFromUrl);
+  }
+
+  // 从hash获取答案（兼容AnkiDroid链接）
+  if (window.location.hash) {
+    var hashContent = window.location.hash.substring(1);
+    if (hashContent.startsWith('answer=')) {
+      document.getElementById('answerInput').value = decodeURIComponent(hashContent.substring(7));
+    } else if (hashContent) {
+      document.getElementById('answerInput').value = decodeURIComponent(hashContent);
+    }
+  }
+
+  // 检测Web Speech API支持
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = function() {
+      isRecording = true;
+      var btn = document.getElementById('recordBtn');
+      btn.textContent = '🔴 录音中...';
+      btn.classList.add('recording');
+      var status = document.getElementById('status');
+      status.textContent = '录音中... 请朗读答案，说完后自动停止';
+      status.className = 'recording';
+    };
+
+    recognition.onresult = function(event) {
+      var interim = '';
+      var final = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      if (interim) {
+        document.getElementById('interim').textContent = '识别中: ' + interim;
+      }
+      if (final) {
+        recognizedText = final;
+        document.getElementById('interim').textContent = '';
+      }
+    };
+
+    recognition.onerror = function(event) {
+      isRecording = false;
+      var btn = document.getElementById('recordBtn');
+      btn.textContent = '🎤 重新录音';
+      btn.classList.remove('recording');
+      var status = document.getElementById('status');
+      var errMsg = '';
+      switch(event.error) {
+        case 'no-speech': errMsg = '未检测到语音，请重试'; break;
+        case 'audio-capture': errMsg = '无法访问麦克风，请检查权限'; break;
+        case 'not-allowed': errMsg = '麦克风权限被拒绝，请在浏览器设置中允许'; break;
+        case 'service-not-allowed': errMsg = '语音服务不可用，请使用Chrome浏览器'; break;
+        case 'network': errMsg = '网络错误，请检查网络连接'; break;
+        default: errMsg = '识别错误: ' + event.error;
+      }
+      status.textContent = '❌ ' + errMsg;
+      status.className = 'error';
+      // 如果是服务不可用，显示手动输入
+      if (event.error === 'service-not-allowed' || event.error === 'not-allowed') {
+        showFallback();
+      }
+    };
+
+    recognition.onend = function() {
+      isRecording = false;
+      var btn = document.getElementById('recordBtn');
+      btn.textContent = '🎤 重新录音';
+      btn.classList.remove('recording');
+
+      if (recognizedText) {
+        doComparison(recognizedText);
+      } else {
+        var status = document.getElementById('status');
+        status.textContent = '未识别到内容，请重试';
+        status.className = 'error';
+      }
+    };
+
+  } else {
+    // 不支持Web Speech API（iOS Safari等）
+    showFallback();
+  }
+
+  // 手动输入对比按钮
+  document.getElementById('compareBtn').onclick = function() {
+    var text = document.getElementById('manualInput').value.trim();
+    if (text) {
+      recognizedText = text;
+      doComparison(text);
+    }
+  };
+
+  // 手动输入回车触发
+  document.getElementById('manualInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      var text = this.value.trim();
+      if (text) {
+        recognizedText = text;
+        doComparison(text);
+      }
+    }
+  });
+}
+
+function showFallback() {
+  document.getElementById('fallbackSection').style.display = 'block';
+  var btn = document.getElementById('recordBtn');
+  btn.style.display = 'none';
+  var status = document.getElementById('status');
+  status.textContent = '当前浏览器不支持语音识别，请使用下方输入框';
+  status.className = 'error';
+}
+
+// ===== 录音控制 =====
+function toggleRecording() {
+  if (!recognition) {
+    showFallback();
+    return;
+  }
+  if (isRecording) {
+    recognition.stop();
+    return;
+  }
+  // 清空之前的结果
+  recognizedText = '';
+  document.getElementById('interim').textContent = '';
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('actions').style.display = 'none';
+
+  try {
+    recognition.start();
+  } catch(e) {
+    // 可能是快速重复点击
+    setTimeout(function() {
+      try { recognition.start(); } catch(e2) {}
+    }, 200);
+  }
+}
+
+function resetRecording() {
+  recognizedText = '';
+  document.getElementById('interim').textContent = '';
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('actions').style.display = 'none';
+  document.getElementById('manualInput').value = '';
+  var status = document.getElementById('status');
+  status.textContent = '点击录音按钮开始背诵';
+  status.className = '';
+  if (recognition && !isRecording) {
+    try { recognition.start(); } catch(e) {}
+  }
+}
+
+// ===== 文本处理 =====
+function removePunctuation(text) {
+  if (!text) return '';
+  // 去HTML标签
+  text = text.replace(/<[^>]+>/g, '');
+  // 去Cloze语法
+  text = text.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g, '$1');
+  // 去HTML实体
+  var el = document.createElement('div');
+  el.innerHTML = text;
+  text = el.textContent || el.innerText || '';
+  // 去中文标点
+  var cnPunct = '，。！？；：、""''（）《》【】…—·「」『』〈〉〔〕〖〗〘〙〚〛～‵′〃﹁﹂﹃﹄﹏﹑﹔﹕﹖﹗﹒';
+  for (var i = 0; i < cnPunct.length; i++) {
+    text = text.split(cnPunct[i]).join('');
+  }
+  // 去英文标点和空白
+  text = text.replace(/[^\w\u4e00-\u9fff]/g, '');
+  return text;
+}
+
+function getCharPinyin(char) {
+  if (!char) return '';
+  if (!/[\u4e00-\u9fff]/.test(char)) return char.toLowerCase();
+  try {
+    if (typeof pinyinPro !== 'undefined') {
+      var py = pinyinPro.pinyin(char, { toneType: 'none', type: 'array' });
+      if (py && py.length > 0) return py[0];
+    }
+  } catch(e) {}
+  return char; // fallback
+}
+
+// ===== DP序列对齐对比 =====
+function compareTexts(recognized, answer) {
+  var rec = removePunctuation(recognized);
+  var ans = removePunctuation(answer);
+
+  var m = rec.length, n = ans.length;
+
+  if (m === 0 && n === 0) {
+    return { alignment: [], stats: { total:0, exact:0, homophone:0, mismatch:0, extra:0, missing:0, score:100 }, result: 'perfect' };
+  }
+  if (m === 0) {
+    return { alignment: ans.split('').map(function(c){return ['missing','',c];}), stats: { total:n, exact:0, homophone:0, mismatch:0, extra:0, missing:n, score:0 }, result: 'incorrect' };
+  }
+  if (n === 0) {
+    return { alignment: rec.split('').map(function(c){return ['extra',c,''];}), stats: { total:m, exact:0, homophone:0, mismatch:0, extra:m, missing:0, score:0 }, result: 'incorrect' };
+  }
+
+  var recChars = rec.split('');
+  var ansChars = ans.split('');
+  var recPy = recChars.map(getCharPinyin);
+  var ansPy = ansChars.map(getCharPinyin);
+
+  // DP表
+  var dp = [];
+  for (var i = 0; i <= m; i++) {
+    dp.push(new Array(n + 1).fill(0));
+    dp[i][0] = i;
+  }
+  for (var j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (var i = 1; i <= m; i++) {
+    for (var j = 1; j <= n; j++) {
+      var cost;
+      if (recChars[i-1] === ansChars[j-1]) {
+        cost = 0;
+      } else if (recPy[i-1] && ansPy[j-1] && recPy[i-1] === ansPy[j-1]) {
+        cost = 1; // 同音字
+      } else {
+        cost = 2; // 不匹配
+      }
+      dp[i][j] = Math.min(dp[i-1][j-1] + cost, dp[i-1][j] + 1, dp[i][j-1] + 1);
+    }
+  }
+
+  // 回溯
+  var alignment = [];
+  var i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0) {
+      var cost;
+      if (recChars[i-1] === ansChars[j-1]) {
+        cost = 0;
+      } else if (recPy[i-1] && ansPy[j-1] && recPy[i-1] === ansPy[j-1]) {
+        cost = 1;
+      } else {
+        cost = 2;
+      }
+      if (dp[i][j] === dp[i-1][j-1] + cost) {
+        if (cost === 0) alignment.push(['exact', recChars[i-1], ansChars[j-1]]);
+        else if (cost === 1) alignment.push(['homophone', recChars[i-1], ansChars[j-1]]);
+        else alignment.push(['mismatch', recChars[i-1], ansChars[j-1]]);
+        i--; j--;
+      } else if (dp[i][j] === dp[i-1][j] + 1) {
+        alignment.push(['extra', recChars[i-1], '']);
+        i--;
+      } else {
+        alignment.push(['missing', '', ansChars[j-1]]);
+        j--;
+      }
+    } else if (i > 0) {
+      alignment.push(['extra', recChars[i-1], '']);
+      i--;
+    } else {
+      alignment.push(['missing', '', ansChars[j-1]]);
+      j--;
+    }
+  }
+  alignment.reverse();
+
+  // 统计
+  var stats = { total: alignment.length, exact:0, homophone:0, mismatch:0, extra:0, missing:0 };
+  for (var k = 0; k < alignment.length; k++) {
+    stats[alignment[k][0]]++;
+  }
+  stats.correct = stats.exact + stats.homophone;
+  stats.score = stats.total > 0 ? Math.round(stats.correct / stats.total * 1000) / 10 : 0;
+
+  var result;
+  if (stats.mismatch === 0 && stats.extra === 0 && stats.missing === 0) {
+    result = stats.homophone === 0 ? 'perfect' : 'correct_with_homophones';
+  } else {
+    result = 'incorrect';
+  }
+
+  return { alignment: alignment, stats: stats, result: result };
+}
+
+// ===== 结果展示 =====
+function doComparison(text) {
+  var answer = document.getElementById('answerInput').value;
+  if (!answer.trim()) {
+    var status = document.getElementById('status');
+    status.textContent = '请先输入或粘贴标准答案';
+    status.className = 'error';
+    return;
+  }
+
+  var comparison = compareTexts(text, answer);
+  var stats = comparison.stats;
+
+  // 生成HTML
+  var recHtml = '';
+  var ansHtml = '';
+  for (var i = 0; i < comparison.alignment.length; i++) {
+    var item = comparison.alignment[i];
+    var status = item[0], rc = item[1], ac = item[2];
+
+    if (status === 'exact') {
+      recHtml += '<span style="color:var(--green)">' + esc(rc) + '</span>';
+      ansHtml += '<span style="color:var(--green)">' + esc(ac) + '</span>';
+    } else if (status === 'homophone') {
+      recHtml += '<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">[' + esc(rc) + '→' + esc(ac) + ']</span>';
+      ansHtml += '<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">' + esc(ac) + '</span>';
+    } else if (status === 'mismatch') {
+      recHtml += '<span style="color:var(--red);font-weight:bold;background:#fadbd8">' + esc(rc) + '</span>';
+      ansHtml += '<span style="color:var(--red);font-weight:bold;background:#fadbd8">' + esc(ac) + '</span>';
+    } else if (status === 'extra') {
+      recHtml += '<span style="color:var(--gray);text-decoration:line-through">' + esc(rc) + '</span>';
+      ansHtml += '<span style="color:#ecf0f1">＿</span>';
+    } else if (status === 'missing') {
+      recHtml += '<span style="color:#ecf0f1">＿</span>';
+      ansHtml += '<span style="color:var(--red);text-decoration:underline;background:#fdf2e9">' + esc(ac) + '</span>';
+    }
+  }
+
+  document.getElementById('recResult').innerHTML = recHtml || '<span style="color:#bdc3c7">（空）</span>';
+  document.getElementById('ansResult').innerHTML = ansHtml || '<span style="color:#bdc3c7">（空）</span>';
+
+  // 结果横幅
+  var banner = document.getElementById('resultBanner');
+  var bannerText = '';
+  if (comparison.result === 'perfect') {
+    banner.className = 'result-banner perfect';
+    bannerText = '✅ 完全正确';
+  } else if (comparison.result === 'correct_with_homophones') {
+    banner.className = 'result-banner homophone';
+    bannerText = '✅ 正确（' + stats.homophone + '个同音字）';
+  } else {
+    banner.className = 'result-banner incorrect';
+    bannerText = '❌ 不正确';
+  }
+  banner.innerHTML = bannerText + '<span class="score">得分 ' + stats.score + '%</span>';
+
+  // 显示结果
+  document.getElementById('results').classList.add('show');
+  document.getElementById('actions').style.display = 'block';
+
+  // 状态
+  var statusEl = document.getElementById('status');
+  if (comparison.result === 'perfect') {
+    statusEl.textContent = '✅ 完全正确！得分 ' + stats.score + '%';
+    statusEl.className = 'success';
+  } else if (comparison.result === 'correct_with_homophones') {
+    statusEl.textContent = '✅ 正确（' + stats.homophone + '个同音字）得分 ' + stats.score + '%';
+    statusEl.className = 'success';
+  } else {
+    statusEl.textContent = '❌ 不正确，得分 ' + stats.score + '%';
+    statusEl.className = 'error';
+  }
+}
+
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function copyResult() {
+  var text = document.getElementById('status').textContent + '\n' +
+    '识别: ' + (document.getElementById('recResult').textContent || '') + '\n' +
+    '答案: ' + (document.getElementById('ansResult').textContent || '');
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      alert('结果已复制到剪贴板');
+    });
+  } else {
+    // Fallback
+    var el = document.createElement('textarea');
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    alert('结果已复制');
+  }
+}
+
+// ===== 事件绑定 =====
+document.getElementById('recordBtn').addEventListener('click', toggleRecording);
+window.addEventListener('load', init);
+</script>
+</body>
+</html>
