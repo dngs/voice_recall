@@ -3,173 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>语音背诵对比</title>
-<script src="https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js"></script>
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-:root {
-  --green:#27ae60; --orange:#e67e22; --red:#e74c3c; --gray:#95a5a6;
-  --bg:#f5f6fa; --card:#fff; --primary:#3498db; --primary-dark:#2980b9;
-  --text:#2c3e50; --text-light:#7f8c8d; --border:#e0e0e0;
-}
-body {
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-  background:var(--bg); color:var(--text); line-height:1.6;
-  -webkit-tap-highlight-color:transparent;
-}
-.container { max-width:600px; margin:0 auto; padding:12px; }
-
-/* Header */
-.header { text-align:center; padding:12px 0 8px; }
-.header h1 { font-size:20px; color:var(--text); }
-
-/* Answer section */
-.answer-section {
-  background:var(--card); border-radius:10px; padding:12px;
-  margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06);
-}
-.answer-section label {
-  font-size:13px; color:var(--text-light); display:block; margin-bottom:6px;
-}
-#answerInput {
-  width:100%; min-height:60px; padding:10px; border:1px solid var(--border);
-  border-radius:8px; font-size:15px; resize:vertical; font-family:inherit;
-  background:#fafafa;
-}
-#answerInput:focus { outline:none; border-color:var(--primary); background:#fff; }
-
-/* Record section */
-.record-section {
-  text-align:center; padding:16px 0;
-}
-#recordBtn {
-  display:inline-flex; align-items:center; justify-content:center; gap:6px;
-  background:var(--primary); color:#fff; border:none;
-  padding:14px 40px; border-radius:50px; font-size:17px; font-weight:bold;
-  cursor:pointer; min-height:52px; transition:all 0.2s;
-  box-shadow:0 2px 8px rgba(52,152,219,0.3);
-}
-#recordBtn:active { transform:scale(0.96); }
-#recordBtn.recording {
-  background:var(--red); animation:pulse 1.5s infinite;
-  box-shadow:0 2px 8px rgba(231,76,60,0.4);
-}
-#recordBtn:disabled { background:var(--gray); cursor:not-allowed; box-shadow:none; }
-@keyframes pulse {
-  0%,100% { box-shadow:0 0 0 0 rgba(231,76,60,0.4); }
-  50% { box-shadow:0 0 0 12px rgba(231,76,60,0); }
-}
-
-/* Fallback input (iOS) */
-.fallback-section {
-  background:#fff3cd; border:1px solid #ffe08a; border-radius:8px;
-  padding:10px; margin-top:10px; display:none;
-}
-.fallback-section p { font-size:13px; color:#856404; margin-bottom:8px; }
-#manualInput {
-  width:100%; padding:10px; border:1px solid var(--border); border-radius:8px;
-  font-size:15px; font-family:inherit;
-}
-#manualInput:focus { outline:none; border-color:var(--primary); }
-#compareBtn {
-  margin-top:8px; width:100%; padding:10px; background:var(--primary);
-  color:#fff; border:none; border-radius:8px; font-size:15px; cursor:pointer;
-}
-#compareBtn:active { background:var(--primary-dark); }
-
-/* Status */
-#status {
-  text-align:center; padding:8px; font-size:14px; color:var(--text-light);
-  min-height:24px;
-}
-#status.recording { color:var(--red); font-weight:bold; }
-#status.success { color:var(--green); font-weight:bold; }
-#status.error { color:var(--red); }
-
-/* Results */
-.results { display:none; }
-.results.show { display:block; }
-.result-banner {
-  text-align:center; padding:12px; border-radius:8px; margin-bottom:10px;
-  font-size:18px; font-weight:bold;
-}
-.result-banner.perfect { background:#d4edda; color:var(--green); }
-.result-banner.homophone { background:#fff3cd; color:#856404; }
-.result-banner.incorrect { background:#f8d7da; color:var(--red); }
-.score { font-size:14px; font-weight:normal; margin-left:8px; }
-
-.text-block {
-  background:var(--card); border-radius:8px; padding:12px; margin-bottom:8px;
-  box-shadow:0 1px 3px rgba(0,0,0,0.06);
-}
-.text-block .label { font-size:12px; color:var(--text-light); margin-bottom:6px; }
-.text-block .content { font-size:20px; line-height:2.4; }
-.text-block .content span { display:inline; }
-
-/* Legend */
-.legend {
-  font-size:12px; color:var(--gray); text-align:center;
-  padding:8px; border-top:1px solid var(--border); margin-top:8px;
-}
-.legend span { margin:0 6px; }
-
-/* Actions */
-.actions { text-align:center; padding:12px 0; }
-.actions button {
-  padding:10px 28px; border:1px solid var(--border); border-radius:8px;
-  background:var(--card); font-size:14px; color:var(--text); cursor:pointer;
-  margin:0 4px;
-}
-.actions button:active { background:#ecf0f1; }
-
-/* Interim results */
-#interim {
-  text-align:center; font-size:15px; color:var(--text-light);
-  min-height:22px; padding:4px; font-style:italic;
-}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--green:#27ae60;--orange:#e67e22;--red:#e74c3c;--gray:#95a5a6;--bg:#f5f6fa;--card:#fff;--primary:#3498db;--primary-dark:#2980b9;--text:#2c3e50;--text-light:#7f8c8d;--border:#e0e0e0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-tap-highlight-color:transparent}
+.container{max-width:600px;margin:0 auto;padding:12px}
+.header{text-align:center;padding:12px 0 8px}
+.header h1{font-size:20px}
+.answer-section{background:var(--card);border-radius:10px;padding:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.answer-section label{font-size:13px;color:var(--text-light);display:block;margin-bottom:6px}
+#answerInput{width:100%;min-height:60px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:15px;resize:vertical;font-family:inherit;background:#fafafa}
+#answerInput:focus{outline:none;border-color:var(--primary);background:#fff}
+.input-section{background:var(--card);border-radius:10px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.input-section .section-title{font-size:14px;font-weight:bold;color:var(--text);margin-bottom:10px}
+#recordBtn{display:block;width:100%;padding:14px;border:none;border-radius:10px;font-size:17px;font-weight:bold;cursor:pointer;min-height:52px;transition:all .2s;background:var(--primary);color:#fff}
+#recordBtn:active{transform:scale(.97)}
+#recordBtn.recording{background:var(--red);animation:pulse 1.5s infinite}
+#recordBtn:disabled{background:var(--gray);cursor:not-allowed}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(231,76,60,.4)}50%{box-shadow:0 0 0 12px rgba(231,76,60,0)}}
+.divider{text-align:center;color:var(--text-light);font-size:13px;margin:10px 0;position:relative}
+.divider:before,.divider:after{content:"";position:absolute;top:50%;width:35%;height:1px;background:var(--border)}
+.divider:before{left:0}.divider:after{right:0}
+#manualInput{width:100%;padding:12px;border:1px solid var(--border);border-radius:8px;font-size:16px;font-family:inherit}
+#manualInput:focus{outline:none;border-color:var(--primary)}
+#compareBtn{margin-top:8px;width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer}
+#compareBtn:active{background:var(--primary-dark)}
+.hint{font-size:12px;color:var(--text-light);margin-top:6px;line-height:1.5}
+#status{text-align:center;padding:8px;font-size:14px;color:var(--text-light);min-height:24px}
+#status.recording{color:var(--red);font-weight:bold}
+#status.success{color:var(--green);font-weight:bold}
+#status.error{color:var(--red)}
+#interim{text-align:center;font-size:15px;color:var(--text-light);min-height:22px;padding:4px;font-style:italic}
+.results{display:none}.results.show{display:block}
+.result-banner{text-align:center;padding:12px;border-radius:8px;margin-bottom:10px;font-size:18px;font-weight:bold}
+.result-banner.perfect{background:#d4edda;color:var(--green)}
+.result-banner.homophone{background:#fff3cd;color:#856404}
+.result-banner.incorrect{background:#f8d7da;color:var(--red)}
+.score{font-size:14px;font-weight:normal;margin-left:8px}
+.text-block{background:var(--card);border-radius:8px;padding:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.text-block .label{font-size:12px;color:var(--text-light);margin-bottom:6px}
+.text-block .content{font-size:20px;line-height:2.4}
+.legend{font-size:12px;color:var(--gray);text-align:center;padding:8px;border-top:1px solid var(--border);margin-top:8px}
+.actions{text-align:center;padding:12px 0}
+.actions button{padding:10px 28px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-size:14px;color:var(--text);cursor:pointer;margin:0 4px}
+.actions button:active{background:#ecf0f1}
+.diag{font-size:11px;color:var(--gray);text-align:center;padding:6px;margin-top:8px;word-break:break-all}
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header">
-    <h1>🎤 语音背诵对比</h1>
-  </div>
+  <div class="header"><h1>🎤 语音背诵对比</h1></div>
 
-  <!-- Answer text -->
   <div class="answer-section">
     <label>📖 标准答案（可编辑）</label>
     <textarea id="answerInput" placeholder="粘贴或输入答案文本..."></textarea>
   </div>
 
-  <!-- Record button -->
-  <div class="record-section">
+  <div class="input-section">
+    <div class="section-title">方式一：语音录音</div>
     <button id="recordBtn">🎤 开始录音</button>
     <div id="interim"></div>
+    <div class="hint" id="recHint">点击按钮朗读答案，说完自动停止</div>
   </div>
 
-  <!-- iOS Fallback -->
-  <div class="fallback-section" id="fallbackSection">
-    <p>💡 当前浏览器不支持语音识别。请点击下方输入框，使用键盘上的<span style="font-size:16px">🎤</span>听写按钮语音输入：</p>
-    <input type="text" id="manualInput" placeholder="点击此处，用键盘听写输入..." autocomplete="off">
+  <div class="divider">或</div>
+
+  <div class="input-section">
+    <div class="section-title">方式二：语音听写输入</div>
+    <input type="text" id="manualInput" placeholder="点此输入框 → 键盘🎤听写" autocomplete="off">
     <button id="compareBtn">对比</button>
+    <div class="hint">点击输入框弹出键盘，按键盘上的🎤图标语音输入</div>
   </div>
 
-  <!-- Status -->
-  <div id="status">点击录音按钮开始背诵</div>
+  <div id="status">选择上方任一方式开始</div>
 
-  <!-- Results -->
   <div class="results" id="results">
     <div class="result-banner" id="resultBanner"></div>
-    <div class="text-block">
-      <div class="label">🗣️ 识别结果</div>
-      <div class="content" id="recResult"></div>
-    </div>
-    <div class="text-block">
-      <div class="label">📖 标准答案</div>
-      <div class="content" id="ansResult"></div>
-    </div>
+    <div class="text-block"><div class="label">🗣️ 识别结果</div><div class="content" id="recResult"></div></div>
+    <div class="text-block"><div class="label">📖 标准答案</div><div class="content" id="ansResult"></div></div>
     <div class="legend">
       <span style="color:var(--green)">■</span>完全匹配
       <span style="color:var(--orange)">■</span>同音字
@@ -178,416 +90,319 @@ body {
     </div>
   </div>
 
-  <!-- Actions -->
   <div class="actions" id="actions" style="display:none">
-    <button onclick="resetRecording()">🎤 重新录音</button>
+    <button onclick="resetAll()">🎤 重新来</button>
     <button onclick="copyResult()">📋 复制结果</button>
   </div>
+
+  <div class="diag" id="diag"></div>
 </div>
 
 <script>
-// ===== 全局状态 =====
+// ===== 全局变量 =====
 var recognition = null;
 var isRecording = false;
 var recognizedText = '';
+var startTimeout = null;
+var pinyinReady = false;
+
+// ===== 异步加载拼音库（不阻塞页面）=====
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/pinyin-pro@3/dist/index.js';
+  s.onload = function(){ pinyinReady = true; };
+  s.onerror = function(){ pinyinReady = false; };
+  document.head.appendChild(s);
+})();
 
 // ===== 初始化 =====
-function init() {
-  // 从URL参数获取答案
-  var params = new URLSearchParams(window.location.search);
-  var answerFromUrl = params.get('answer') || params.get('a') || '';
-  if (answerFromUrl) {
-    document.getElementById('answerInput').value = decodeURIComponent(answerFromUrl);
+function init(){
+  // 从URL获取答案
+  var params = new URLSearchParams(location.search);
+  var ans = params.get('answer') || params.get('a') || '';
+  if(!ans && location.hash){
+    var h = location.hash.substring(1);
+    if(h.indexOf('answer=')===0) ans = decodeURIComponent(h.substring(7));
+    else if(h) ans = decodeURIComponent(h);
   }
+  if(ans) document.getElementById('answerInput').value = ans;
 
-  // 从hash获取答案（兼容AnkiDroid链接）
-  if (window.location.hash) {
-    var hashContent = window.location.hash.substring(1);
-    if (hashContent.startsWith('answer=')) {
-      document.getElementById('answerInput').value = decodeURIComponent(hashContent.substring(7));
-    } else if (hashContent) {
-      document.getElementById('answerInput').value = decodeURIComponent(hashContent);
-    }
-  }
+  // 检测环境
+  var hasSR = ('SpeechRecognition' in window) || ('webkitSpeechRecognition' in window);
+  var isSecure = window.isSecureContext || location.protocol==='https:' || location.hostname==='localhost' || location.protocol==='file:';
+  var ua = navigator.userAgent;
 
-  // 检测Web Speech API支持
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
+  var diag = document.getElementById('diag');
+  diag.innerHTML = '浏览器: ' + (ua.indexOf('iPhone')>-1||ua.indexOf('iPad')>-1?'iOS':ua.indexOf('Android')>-1?'Android':'其他') +
+    ' | 语音API: ' + (hasSR?'支持':'不支持') +
+    ' | HTTPS: ' + (isSecure?'是':'否') +
+    ' | 拼音库: ' + (pinyinReady?'已加载':'加载中');
+
+  // 设置录音
+  if(hasSR){
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
     recognition.lang = 'zh-CN';
     recognition.continuous = false;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    recognition.onstart = function() {
+    recognition.onstart = function(){
+      clearTimeout(startTimeout);
       isRecording = true;
       var btn = document.getElementById('recordBtn');
-      btn.textContent = '🔴 录音中...';
+      btn.textContent = '🔴 录音中... 点击停止';
       btn.classList.add('recording');
-      var status = document.getElementById('status');
-      status.textContent = '录音中... 请朗读答案，说完后自动停止';
-      status.className = 'recording';
+      var st = document.getElementById('status');
+      st.textContent = '录音中... 请朗读答案';
+      st.className = 'recording';
     };
 
-    recognition.onresult = function(event) {
-      var interim = '';
-      var final = '';
-      for (var i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
+    recognition.onresult = function(event){
+      var interim='', final='';
+      for(var i=event.resultIndex;i<event.results.length;i++){
+        if(event.results[i].isFinal) final += event.results[i][0].transcript;
+        else interim += event.results[i][0].transcript;
       }
-      if (interim) {
-        document.getElementById('interim').textContent = '识别中: ' + interim;
-      }
-      if (final) {
-        recognizedText = final;
-        document.getElementById('interim').textContent = '';
-      }
+      if(interim) document.getElementById('interim').textContent = '识别中: ' + interim;
+      if(final){ recognizedText = final; document.getElementById('interim').textContent=''; }
     };
 
-    recognition.onerror = function(event) {
+    recognition.onerror = function(event){
+      clearTimeout(startTimeout);
       isRecording = false;
       var btn = document.getElementById('recordBtn');
       btn.textContent = '🎤 重新录音';
       btn.classList.remove('recording');
-      var status = document.getElementById('status');
-      var errMsg = '';
-      switch(event.error) {
-        case 'no-speech': errMsg = '未检测到语音，请重试'; break;
-        case 'audio-capture': errMsg = '无法访问麦克风，请检查权限'; break;
-        case 'not-allowed': errMsg = '麦克风权限被拒绝，请在浏览器设置中允许'; break;
-        case 'service-not-allowed': errMsg = '语音服务不可用，请使用Chrome浏览器'; break;
-        case 'network': errMsg = '网络错误，请检查网络连接'; break;
-        default: errMsg = '识别错误: ' + event.error;
+      var st = document.getElementById('status');
+      var msg = '';
+      switch(event.error){
+        case 'no-speech': msg='未检测到语音，请重试'; break;
+        case 'audio-capture': msg='无法访问麦克风，请检查设备'; break;
+        case 'not-allowed': msg='麦克风权限被拒绝。请长按地址栏左侧🔒图标→允许麦克风'; break;
+        case 'service-not-allowed': msg='语音服务不可用。请用方式二（听写输入）'; break;
+        case 'network': msg='网络错误，语音服务无法连接。请用方式二（听写输入）'; break;
+        case 'aborted': msg='录音已取消'; break;
+        default: msg='错误: ' + event.error;
       }
-      status.textContent = '❌ ' + errMsg;
-      status.className = 'error';
-      // 如果是服务不可用，显示手动输入
-      if (event.error === 'service-not-allowed' || event.error === 'not-allowed') {
-        showFallback();
-      }
+      st.textContent = '❌ ' + msg;
+      st.className = 'error';
+      document.getElementById('recHint').textContent = '录音不可用？请用下方方式二：点击输入框→键盘听写';
     };
 
-    recognition.onend = function() {
+    recognition.onend = function(){
+      clearTimeout(startTimeout);
       isRecording = false;
       var btn = document.getElementById('recordBtn');
       btn.textContent = '🎤 重新录音';
       btn.classList.remove('recording');
-
-      if (recognizedText) {
+      if(recognizedText){
         doComparison(recognizedText);
       } else {
-        var status = document.getElementById('status');
-        status.textContent = '未识别到内容，请重试';
-        status.className = 'error';
+        var st = document.getElementById('status');
+        st.textContent = '未识别到内容，请重试或用方式二';
+        st.className = 'error';
       }
     };
 
   } else {
-    // 不支持Web Speech API（iOS Safari等）
-    showFallback();
+    // 不支持Web Speech API
+    var btn = document.getElementById('recordBtn');
+    btn.textContent = '⚠️ 此浏览器不支持语音录音';
+    btn.disabled = true;
+    document.getElementById('recHint').textContent = '请用方式二：点击输入框→键盘上的🎤听写';
   }
 
-  // 手动输入对比按钮
-  document.getElementById('compareBtn').onclick = function() {
-    var text = document.getElementById('manualInput').value.trim();
-    if (text) {
-      recognizedText = text;
-      doComparison(text);
-    }
+  // 手动输入
+  document.getElementById('compareBtn').onclick = function(){
+    var t = document.getElementById('manualInput').value.trim();
+    if(t){ recognizedText = t; doComparison(t); }
   };
-
-  // 手动输入回车触发
-  document.getElementById('manualInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      var text = this.value.trim();
-      if (text) {
-        recognizedText = text;
-        doComparison(text);
-      }
+  document.getElementById('manualInput').addEventListener('keypress', function(e){
+    if(e.key==='Enter'){ var t=this.value.trim(); if(t){ recognizedText=t; doComparison(t); } }
+  });
+  document.getElementById('manualInput').addEventListener('input', function(){
+    if(this.value.trim().length > 0){
+      document.getElementById('compareBtn').style.display='block';
     }
   });
 }
 
-function showFallback() {
-  document.getElementById('fallbackSection').style.display = 'block';
-  var btn = document.getElementById('recordBtn');
-  btn.style.display = 'none';
-  var status = document.getElementById('status');
-  status.textContent = '当前浏览器不支持语音识别，请使用下方输入框';
-  status.className = 'error';
-}
-
 // ===== 录音控制 =====
-function toggleRecording() {
-  if (!recognition) {
-    showFallback();
+function toggleRecording(){
+  if(!recognition){
+    document.getElementById('status').textContent = '⚠️ 此浏览器不支持语音录音，请用方式二';
+    document.getElementById('status').className = 'error';
     return;
   }
-  if (isRecording) {
-    recognition.stop();
+  if(isRecording){
+    try{ recognition.stop(); }catch(e){}
     return;
   }
+
   // 清空之前的结果
   recognizedText = '';
   document.getElementById('interim').textContent = '';
   document.getElementById('results').classList.remove('show');
   document.getElementById('actions').style.display = 'none';
 
+  // 立即给视觉反馈
+  var btn = document.getElementById('recordBtn');
+  btn.textContent = '正在启动...';
+  var st = document.getElementById('status');
+  st.textContent = '正在启动录音...';
+  st.className = '';
+
+  // 超时检测：3秒内如果onstart没触发，说明有问题
+  clearTimeout(startTimeout);
+  startTimeout = setTimeout(function(){
+    if(!isRecording){
+      btn.textContent = '🎤 重新录音';
+      st.textContent = '❌ 录音启动失败。可能原因：1)麦克风权限未授予 2)网络无法连接语音服务。请用方式二：点击输入框→键盘听写';
+      st.className = 'error';
+      document.getElementById('recHint').innerHTML = '👉 <b>推荐</b>：用下方方式二，点击输入框弹出键盘，按键盘上的🎤图标语音输入';
+    }
+  }, 3000);
+
   try {
     recognition.start();
   } catch(e) {
-    // 可能是快速重复点击
-    setTimeout(function() {
-      try { recognition.start(); } catch(e2) {}
-    }, 200);
+    clearTimeout(startTimeout);
+    btn.textContent = '🎤 重新录音';
+    st.textContent = '❌ 启动失败: ' + e.message + '。请用方式二：点击输入框→键盘听写';
+    st.className = 'error';
+    document.getElementById('recHint').innerHTML = '👉 <b>推荐</b>：用下方方式二，点击输入框弹出键盘，按键盘上的🎤图标语音输入';
   }
 }
 
-function resetRecording() {
+function resetAll(){
   recognizedText = '';
   document.getElementById('interim').textContent = '';
+  document.getElementById('manualInput').value = '';
   document.getElementById('results').classList.remove('show');
   document.getElementById('actions').style.display = 'none';
-  document.getElementById('manualInput').value = '';
-  var status = document.getElementById('status');
-  status.textContent = '点击录音按钮开始背诵';
-  status.className = '';
-  if (recognition && !isRecording) {
-    try { recognition.start(); } catch(e) {}
-  }
+  var st = document.getElementById('status');
+  st.textContent = '选择上方任一方式开始';
+  st.className = '';
 }
 
 // ===== 文本处理 =====
-function removePunctuation(text) {
-  if (!text) return '';
-  // 去HTML标签
-  text = text.replace(/<[^>]+>/g, '');
-  // 去Cloze语法
-  text = text.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g, '$1');
-  // 去HTML实体
+function removePunctuation(text){
+  if(!text) return '';
+  text = text.replace(/<[^>]+>/g,'');
+  text = text.replace(/\{\{c\d+::(.*?)(::.*?)?\}\}/g,'$1');
   var el = document.createElement('div');
   el.innerHTML = text;
   text = el.textContent || el.innerText || '';
-  // 去中文标点
-  var cnPunct = '，。！？；：、""''（）《》【】…—·「」『』〈〉〔〕〖〗〘〙〚〛～‵′〃﹁﹂﹃﹄﹏﹑﹔﹕﹖﹗﹒';
-  for (var i = 0; i < cnPunct.length; i++) {
-    text = text.split(cnPunct[i]).join('');
-  }
-  // 去英文标点和空白
-  text = text.replace(/[^\w\u4e00-\u9fff]/g, '');
+  var cn = '，。！？；：、""''（）《》【】…—·「」『』〈〉〔〕〖〗〘〙〚〛～';
+  for(var i=0;i<cn.length;i++) text = text.split(cn[i]).join('');
+  text = text.replace(/[^\w\u4e00-\u9fff]/g,'');
   return text;
 }
 
-function getCharPinyin(char) {
-  if (!char) return '';
-  if (!/[\u4e00-\u9fff]/.test(char)) return char.toLowerCase();
-  try {
-    if (typeof pinyinPro !== 'undefined') {
-      var py = pinyinPro.pinyin(char, { toneType: 'none', type: 'array' });
-      if (py && py.length > 0) return py[0];
-    }
-  } catch(e) {}
-  return char; // fallback
+function getCharPinyin(ch){
+  if(!ch) return '';
+  if(!/[\u4e00-\u9fff]/.test(ch)) return ch.toLowerCase();
+  if(pinyinReady && typeof pinyinPro!=='undefined'){
+    try{
+      var py = pinyinPro.pinyin(ch,{toneType:'none',type:'array'});
+      if(py && py.length>0) return py[0];
+    }catch(e){}
+  }
+  return ch;
 }
 
-// ===== DP序列对齐对比 =====
-function compareTexts(recognized, answer) {
-  var rec = removePunctuation(recognized);
-  var ans = removePunctuation(answer);
+// ===== DP对比 =====
+function compareTexts(rec, ans){
+  rec = removePunctuation(rec);
+  ans = removePunctuation(ans);
+  var m=rec.length, n=ans.length;
+  if(m===0&&n===0) return {alignment:[],stats:{total:0,exact:0,homophone:0,mismatch:0,extra:0,missing:0,score:100},result:'perfect'};
+  if(m===0) return {alignment:ans.split('').map(function(c){return['missing','',c]}),stats:{total:n,exact:0,homophone:0,mismatch:0,extra:0,missing:n,score:0},result:'incorrect'};
+  if(n===0) return {alignment:rec.split('').map(function(c){return['extra',c,'']}),stats:{total:m,exact:0,homophone:0,mismatch:0,extra:m,missing:0,score:0},result:'incorrect'};
 
-  var m = rec.length, n = ans.length;
-
-  if (m === 0 && n === 0) {
-    return { alignment: [], stats: { total:0, exact:0, homophone:0, mismatch:0, extra:0, missing:0, score:100 }, result: 'perfect' };
+  var rc=rec.split(''), ac=ans.split('');
+  var rpy=rc.map(getCharPinyin), apy=ac.map(getCharPinyin);
+  var dp=[];
+  for(var i=0;i<=m;i++){dp.push(new Array(n+1).fill(0));dp[i][0]=i;}
+  for(var j=0;j<=n;j++) dp[0][j]=j;
+  for(i=1;i<=m;i++)for(j=1;j<=n;j++){
+    var c;
+    if(rc[i-1]===ac[j-1]) c=0;
+    else if(rpy[i-1]&&apy[j-1]&&rpy[i-1]===apy[j-1]) c=1;
+    else c=2;
+    dp[i][j]=Math.min(dp[i-1][j-1]+c,dp[i-1][j]+1,dp[i][j-1]+1);
   }
-  if (m === 0) {
-    return { alignment: ans.split('').map(function(c){return ['missing','',c];}), stats: { total:n, exact:0, homophone:0, mismatch:0, extra:0, missing:n, score:0 }, result: 'incorrect' };
+  var align=[]; i=m;j=n;
+  while(i>0||j>0){
+    if(i>0&&j>0){
+      var c;
+      if(rc[i-1]===ac[j-1]) c=0;
+      else if(rpy[i-1]&&apy[j-1]&&rpy[i-1]===apy[j-1]) c=1;
+      else c=2;
+      if(dp[i][j]===dp[i-1][j-1]+c){
+        if(c===0) align.push(['exact',rc[i-1],ac[j-1]]);
+        else if(c===1) align.push(['homophone',rc[i-1],ac[j-1]]);
+        else align.push(['mismatch',rc[i-1],ac[j-1]]);
+        i--;j--;
+      }else if(dp[i][j]===dp[i-1][j]+1){align.push(['extra',rc[i-1],'']);i--;}
+      else{align.push(['missing','',ac[j-1]]);j--;}
+    }else if(i>0){align.push(['extra',rc[i-1],'']);i--;}
+    else{align.push(['missing','',ac[j-1]]);j--;}
   }
-  if (n === 0) {
-    return { alignment: rec.split('').map(function(c){return ['extra',c,''];}), stats: { total:m, exact:0, homophone:0, mismatch:0, extra:m, missing:0, score:0 }, result: 'incorrect' };
-  }
-
-  var recChars = rec.split('');
-  var ansChars = ans.split('');
-  var recPy = recChars.map(getCharPinyin);
-  var ansPy = ansChars.map(getCharPinyin);
-
-  // DP表
-  var dp = [];
-  for (var i = 0; i <= m; i++) {
-    dp.push(new Array(n + 1).fill(0));
-    dp[i][0] = i;
-  }
-  for (var j = 0; j <= n; j++) dp[0][j] = j;
-
-  for (var i = 1; i <= m; i++) {
-    for (var j = 1; j <= n; j++) {
-      var cost;
-      if (recChars[i-1] === ansChars[j-1]) {
-        cost = 0;
-      } else if (recPy[i-1] && ansPy[j-1] && recPy[i-1] === ansPy[j-1]) {
-        cost = 1; // 同音字
-      } else {
-        cost = 2; // 不匹配
-      }
-      dp[i][j] = Math.min(dp[i-1][j-1] + cost, dp[i-1][j] + 1, dp[i][j-1] + 1);
-    }
-  }
-
-  // 回溯
-  var alignment = [];
-  var i = m, j = n;
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0) {
-      var cost;
-      if (recChars[i-1] === ansChars[j-1]) {
-        cost = 0;
-      } else if (recPy[i-1] && ansPy[j-1] && recPy[i-1] === ansPy[j-1]) {
-        cost = 1;
-      } else {
-        cost = 2;
-      }
-      if (dp[i][j] === dp[i-1][j-1] + cost) {
-        if (cost === 0) alignment.push(['exact', recChars[i-1], ansChars[j-1]]);
-        else if (cost === 1) alignment.push(['homophone', recChars[i-1], ansChars[j-1]]);
-        else alignment.push(['mismatch', recChars[i-1], ansChars[j-1]]);
-        i--; j--;
-      } else if (dp[i][j] === dp[i-1][j] + 1) {
-        alignment.push(['extra', recChars[i-1], '']);
-        i--;
-      } else {
-        alignment.push(['missing', '', ansChars[j-1]]);
-        j--;
-      }
-    } else if (i > 0) {
-      alignment.push(['extra', recChars[i-1], '']);
-      i--;
-    } else {
-      alignment.push(['missing', '', ansChars[j-1]]);
-      j--;
-    }
-  }
-  alignment.reverse();
-
-  // 统计
-  var stats = { total: alignment.length, exact:0, homophone:0, mismatch:0, extra:0, missing:0 };
-  for (var k = 0; k < alignment.length; k++) {
-    stats[alignment[k][0]]++;
-  }
-  stats.correct = stats.exact + stats.homophone;
-  stats.score = stats.total > 0 ? Math.round(stats.correct / stats.total * 1000) / 10 : 0;
-
-  var result;
-  if (stats.mismatch === 0 && stats.extra === 0 && stats.missing === 0) {
-    result = stats.homophone === 0 ? 'perfect' : 'correct_with_homophones';
-  } else {
-    result = 'incorrect';
-  }
-
-  return { alignment: alignment, stats: stats, result: result };
+  align.reverse();
+  var s={total:align.length,exact:0,homophone:0,mismatch:0,extra:0,missing:0};
+  for(var k=0;k<align.length;k++) s[align[k][0]]++;
+  s.correct=s.exact+s.homophone;
+  s.score=s.total>0?Math.round(s.correct/s.total*1000)/10:0;
+  var r;
+  if(s.mismatch===0&&s.extra===0&&s.missing===0) r=s.homophone===0?'perfect':'correct_with_homophones';
+  else r='incorrect';
+  return {alignment:align,stats:s,result:r};
 }
 
 // ===== 结果展示 =====
-function doComparison(text) {
-  var answer = document.getElementById('answerInput').value;
-  if (!answer.trim()) {
-    var status = document.getElementById('status');
-    status.textContent = '请先输入或粘贴标准答案';
-    status.className = 'error';
+function doComparison(text){
+  var ans = document.getElementById('answerInput').value;
+  if(!ans.trim()){
+    var st=document.getElementById('status');
+    st.textContent='请先输入标准答案';
+    st.className='error';
     return;
   }
-
-  var comparison = compareTexts(text, answer);
-  var stats = comparison.stats;
-
-  // 生成HTML
-  var recHtml = '';
-  var ansHtml = '';
-  for (var i = 0; i < comparison.alignment.length; i++) {
-    var item = comparison.alignment[i];
-    var status = item[0], rc = item[1], ac = item[2];
-
-    if (status === 'exact') {
-      recHtml += '<span style="color:var(--green)">' + esc(rc) + '</span>';
-      ansHtml += '<span style="color:var(--green)">' + esc(ac) + '</span>';
-    } else if (status === 'homophone') {
-      recHtml += '<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">[' + esc(rc) + '→' + esc(ac) + ']</span>';
-      ansHtml += '<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">' + esc(ac) + '</span>';
-    } else if (status === 'mismatch') {
-      recHtml += '<span style="color:var(--red);font-weight:bold;background:#fadbd8">' + esc(rc) + '</span>';
-      ansHtml += '<span style="color:var(--red);font-weight:bold;background:#fadbd8">' + esc(ac) + '</span>';
-    } else if (status === 'extra') {
-      recHtml += '<span style="color:var(--gray);text-decoration:line-through">' + esc(rc) + '</span>';
-      ansHtml += '<span style="color:#ecf0f1">＿</span>';
-    } else if (status === 'missing') {
-      recHtml += '<span style="color:#ecf0f1">＿</span>';
-      ansHtml += '<span style="color:var(--red);text-decoration:underline;background:#fdf2e9">' + esc(ac) + '</span>';
-    }
+  var cmp = compareTexts(text, ans);
+  var s = cmp.stats;
+  var rh='', ah='';
+  for(var i=0;i<cmp.alignment.length;i++){
+    var item=cmp.alignment[i], st=item[0], rc=item[1], ac=item[2];
+    if(st==='exact'){rh+='<span style="color:var(--green)">'+esc(rc)+'</span>';ah+='<span style="color:var(--green)">'+esc(ac)+'</span>';}
+    else if(st==='homophone'){rh+='<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">['+esc(rc)+'→'+esc(ac)+']</span>';ah+='<span style="color:var(--orange);text-decoration:underline wavy var(--orange)" title="同音字">'+esc(ac)+'</span>';}
+    else if(st==='mismatch'){rh+='<span style="color:var(--red);font-weight:bold;background:#fadbd8">'+esc(rc)+'</span>';ah+='<span style="color:var(--red);font-weight:bold;background:#fadbd8">'+esc(ac)+'</span>';}
+    else if(st==='extra'){rh+='<span style="color:var(--gray);text-decoration:line-through">'+esc(rc)+'</span>';ah+='<span style="color:#ecf0f1">＿</span>';}
+    else if(st==='missing'){rh+='<span style="color:#ecf0f1">＿</span>';ah+='<span style="color:var(--red);text-decoration:underline;background:#fdf2e9">'+esc(ac)+'</span>';}
   }
-
-  document.getElementById('recResult').innerHTML = recHtml || '<span style="color:#bdc3c7">（空）</span>';
-  document.getElementById('ansResult').innerHTML = ansHtml || '<span style="color:#bdc3c7">（空）</span>';
-
-  // 结果横幅
-  var banner = document.getElementById('resultBanner');
-  var bannerText = '';
-  if (comparison.result === 'perfect') {
-    banner.className = 'result-banner perfect';
-    bannerText = '✅ 完全正确';
-  } else if (comparison.result === 'correct_with_homophones') {
-    banner.className = 'result-banner homophone';
-    bannerText = '✅ 正确（' + stats.homophone + '个同音字）';
-  } else {
-    banner.className = 'result-banner incorrect';
-    bannerText = '❌ 不正确';
-  }
-  banner.innerHTML = bannerText + '<span class="score">得分 ' + stats.score + '%</span>';
-
-  // 显示结果
+  document.getElementById('recResult').innerHTML=rh||'<span style="color:#bdc3c7">（空）</span>';
+  document.getElementById('ansResult').innerHTML=ah||'<span style="color:#bdc3c7">（空）</span>';
+  var banner=document.getElementById('resultBanner');
+  var bt='';
+  if(cmp.result==='perfect'){banner.className='result-banner perfect';bt='✅ 完全正确';}
+  else if(cmp.result==='correct_with_homophones'){banner.className='result-banner homophone';bt='✅ 正确（'+s.homophone+'个同音字）';}
+  else{banner.className='result-banner incorrect';bt='❌ 不正确';}
+  banner.innerHTML=bt+'<span class="score">得分 '+s.score+'%</span>';
   document.getElementById('results').classList.add('show');
-  document.getElementById('actions').style.display = 'block';
-
-  // 状态
-  var statusEl = document.getElementById('status');
-  if (comparison.result === 'perfect') {
-    statusEl.textContent = '✅ 完全正确！得分 ' + stats.score + '%';
-    statusEl.className = 'success';
-  } else if (comparison.result === 'correct_with_homophones') {
-    statusEl.textContent = '✅ 正确（' + stats.homophone + '个同音字）得分 ' + stats.score + '%';
-    statusEl.className = 'success';
-  } else {
-    statusEl.textContent = '❌ 不正确，得分 ' + stats.score + '%';
-    statusEl.className = 'error';
-  }
+  document.getElementById('actions').style.display='block';
+  var stEl=document.getElementById('status');
+  if(cmp.result==='perfect'){stEl.textContent='✅ 完全正确！得分 '+s.score+'%';stEl.className='success';}
+  else if(cmp.result==='correct_with_homophones'){stEl.textContent='✅ 正确（'+s.homophone+'个同音字）得分 '+s.score+'%';stEl.className='success';}
+  else{stEl.textContent='❌ 不正确，得分 '+s.score+'%';stEl.className='error';}
 }
 
-function esc(s) {
-  if (!s) return '';
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-function copyResult() {
-  var text = document.getElementById('status').textContent + '\n' +
-    '识别: ' + (document.getElementById('recResult').textContent || '') + '\n' +
-    '答案: ' + (document.getElementById('ansResult').textContent || '');
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(function() {
-      alert('结果已复制到剪贴板');
-    });
-  } else {
-    // Fallback
-    var el = document.createElement('textarea');
-    el.value = text;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-    alert('结果已复制');
-  }
+function copyResult(){
+  var t=document.getElementById('status').textContent+'\n识别: '+(document.getElementById('recResult').textContent||'')+'\n答案: '+(document.getElementById('ansResult').textContent||'');
+  if(navigator.clipboard){navigator.clipboard.writeText(t).then(function(){alert('已复制')});}
+  else{var e=document.createElement('textarea');e.value=t;document.body.appendChild(e);e.select();document.execCommand('copy');document.body.removeChild(e);alert('已复制');}
 }
 
 // ===== 事件绑定 =====
